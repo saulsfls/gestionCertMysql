@@ -207,6 +207,123 @@ async function eliminarCertificado(id) {
   }
 }
 
+// Obtener todos los equipment_id que tienen certificados asociados
+async function obtenerEquipmentId() { //Muestra todos los equipment_id que tienen certificados asociados, para poder filtrar en la tabla de certificados.
+  const query = `
+    SELECT DISTINCT equipment_id
+    FROM certificados
+    WHERE equipment_id IS NOT NULL
+      AND equipment_id <> ''
+    ORDER BY equipment_id ASC;
+  `;
+
+  try {
+    const rows = await pool.query(query);
+    return rows.map(r => r.equipment_id);
+  } catch (err) {
+    console.error('Error al obtener equipment_ids:', err);
+    throw err;
+  }
+}
+
+// Obtener todas las tablas de resultados asociadas a un equipment_id
+async function obtenerTablas(equipmentId) {
+  const query = `
+    SELECT
+      id, cc, equipment_id, name_equipment,
+      date_cal, date_cc, entity, cert_type, active, data
+    FROM certificados
+    WHERE equipment_id = ?
+      AND data IS NOT NULL
+    ORDER BY date_cal DESC, id DESC;
+  `;
+
+  try {
+    const rows = await pool.query(query, [equipmentId]);   // 👈 AQUÍ el fix
+    const tablas = [];
+
+    for (const row of rows) {
+      let payload;
+      try {
+        payload = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      } catch (e) {
+        console.warn(`Certificado ${row.id} (cc=${row.cc}) tiene 'data' inválido, se omite.`);
+        continue;
+      }
+
+      const resultTables = payload?.['Result Tables'] || [];
+
+      for (const t of resultTables) {
+        const filas =
+          t.rows ||
+          t.data ||
+          t.values ||
+          t.measurements ||
+          [];
+
+        tablas.push({
+          certificado_id:  row.id,
+          cc:              row.cc,
+          equipment_id:    row.equipment_id,
+          name_equipment:  row.name_equipment,
+          date_cal:        row.date_cal,
+          date_cc:         row.date_cc,
+          entity:          row.entity,
+          cert_type:       row.cert_type,
+          active:          !!row.active,
+
+          table_id:               t.table_id,
+          cc_id:                  t.cc_id,
+          title:                  t.title,
+          parameter:              t.parameter,
+          unit:                   t.unit,
+          range:                  t.range,
+          cmc:                    t.cmc,
+          calibration_equation:   t.calibration_equation,
+          comments:               t.comments,
+          columns:                t.columns || [],
+          rows:                   filas
+        });
+      }
+    }
+
+    return tablas;
+  } catch (err) {
+    console.error('Error al obtener tablas por equipment_id:', err);
+    throw err;
+  }
+}
+
+// Obtener un certificado por su cc (folio) sin traer la columna data
+async function obtenerCertificadoCc(cc) {
+  const query = `
+    SELECT
+      id,
+      cc,
+      equipment_id,
+      name_equipment,
+      date_cal,
+      date_cc,
+      calibration_interval,
+      resolution,
+      entity,
+      cert_type,
+      comments,
+      active
+    FROM certificados
+    WHERE cc = ?
+    LIMIT 1;
+  `;
+
+  try {
+    const rows = await pool.query(query, [cc]);
+    return rows[0] ?? null;
+  } catch (err) {
+    console.error('Error al obtener certificado por cc:', err);
+    throw err;
+  }
+}
+
 module.exports = {
   query: (text, params) => pool.query(text, params),
   crearCertificado,
@@ -216,5 +333,8 @@ module.exports = {
   desactivarCertificado,
   activarCertificado,
   modificarCertificado,
-  eliminarCertificado
+  eliminarCertificado,
+  obtenerEquipmentId,
+  obtenerTablas,
+  obtenerCertificadoCc
 };

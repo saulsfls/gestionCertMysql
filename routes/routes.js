@@ -9,17 +9,12 @@ const {
   desactivarCertificado, 
   activarCertificado, 
   modificarCertificado,
-  obtenerCertificadoEquipmentId,
-  eliminarCertificado
+  eliminarCertificado,
+  obtenerEquipmentId,
+  obtenerTablas,
+  obtenerCertificadoCc
 } = require('../controllers/basedatos');
-
-// Controlador para el procesamiento de la imagen
-const { procesarTabla } = require('../controllers/pimage');
-
-//Rutas de procesamiento de la imgen 
-//Se desactiva temporalmente la ruta de procesamiento de la imagen, ya que no se está utilizando en el proyecto actual.
-//router.post('/procesar-tabla', procesarTabla);
-
+//El procesamiento de la tabla se hace en un servidor externo, por lo que no es necesario procesar la tabla en este archivo.
 //Rutas de la base de datos
 router.post('/nuevo', async (req, res) => {
   try {
@@ -150,6 +145,75 @@ router.delete('/certificados/:id/eliminar', async (req, res) => {
     res.status(500).json({
       ok: false,
       message: 'Error al eliminar el certificado'
+    });
+  }
+});
+
+// Devuelve la lista de equipment_id que tienen certificados asociados
+router.get('/equipos', async (req, res) => {
+  try {
+    const equipos = await obtenerEquipmentId();
+    res.status(200).json({
+      ok: true,
+      data: equipos
+    });
+  } catch (error) {
+    console.error('Error al obtener los equipment_id:', error);
+    res.status(500).json({
+      ok: false,
+      message: 'Error en el servidor al obtener los equipos'
+    });
+  }
+});
+
+// Devuelve todas las tablas de resultados asociadas a un equipment_id
+router.get('/equipos/:equipmentId/tablas', async (req, res) => {
+  try {
+    const { equipmentId } = req.params;
+    const tablas = await obtenerTablas(equipmentId);
+
+    if (!tablas || tablas.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        message: `No se encontraron tablas para el equipo ${equipmentId}`
+      });
+    }
+
+    res.status(200).json({
+      ok: true,
+      total: tablas.length,
+      data: tablas
+    });
+  } catch (error) {
+    console.error('Error al obtener tablas del equipo:', error);
+    res.status(500).json({
+      ok: false,
+      message: 'Error en el servidor al obtener las tablas del equipo'
+    });
+  }
+});
+
+router.get('/certificados/cc/:cc', async (req, res) => {
+  try {
+    const { cc } = req.params;
+    const certificado = await obtenerCertificadoCc(cc);
+
+    if (!certificado) {
+      return res.status(404).json({
+        ok: false,
+        message: `Certificado con cc ${cc} no encontrado`
+      });
+    }
+
+    res.status(200).json({
+      ok: true,
+      data: certificado
+    });
+  } catch (error) {
+    console.error('Error al obtener certificado por cc:', error);
+    res.status(500).json({
+      ok: false,
+      message: 'Error en el servidor al obtener el certificado'
     });
   }
 });
