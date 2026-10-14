@@ -30,18 +30,9 @@ async function crearCertificado(datosCertificado) {
 
   const query = `
     INSERT INTO certificados (
-      cc,
-      equipment_id,
-      name_equipment,
-      date_cal,
-      date_cc,
-      calibration_interval,
-      resolution,
-      entity,
-      cert_type,
-      comments,
-      active,
-      data
+      cc, equipment_id, name_equipment, date_cal, date_cc,
+      calibration_interval, resolution, entity, cert_type,
+      comments, active, data
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `;
@@ -62,15 +53,22 @@ async function crearCertificado(datosCertificado) {
   ];
 
   try {
-    const res = await pool.query(query, values);
-    // Retornamos el elemento insertado obteniéndolo con el insertId generado
-    return await obtenerCertificadoId(res.insertId);
+    const res = await pool.query(query, values);       // sin [ ]
+    return await obtenerCertificadoId(res.insertId);   // res.insertId directo
   } catch (err) {
     console.error('Error al insertar certificado:', err);
-    throw err;
+
+    const wrapped = new Error(err.message);
+    wrapped.code       = err.code;
+    wrapped.errno      = err.errno;
+    wrapped.sqlState   = err.sqlState;
+    wrapped.sqlMessage = err.sqlMessage ?? err.message;
+    wrapped.column     = err.sqlMessage?.match(/for key '([^']+)'/)?.[1]
+                      ?? err.message?.match(/for key '([^']+)'/)?.[1]
+                      ?? null;
+    throw wrapped;
   }
 }
-
 // Obtener todos los certificados
 async function obtenerCertificados() {
   //console.log('Obteniendo todos los certificados...');

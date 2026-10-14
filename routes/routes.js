@@ -19,15 +19,132 @@ const {
 router.post('/nuevo', async (req, res) => {
   try {
     const nuevoCertificado = await crearCertificado(req.body);
-    res.status(201).json({
+    return res.status(201).json({
       ok: true,
       data: nuevoCertificado
     });
   } catch (error) {
     console.error('Error al guardar el certificado:', error);
-    res.status(500).json({
+
+    const code     = error.code     ?? null;   // 'ER_DUP_ENTRY'
+    const errno    = error.errno    ?? null;   // 1062
+    const sqlState = error.sqlState ?? null;   // '23000'
+    const message  = error.message  ?? '';
+    const detail   = error.sqlMessage ?? error.detail ?? '';
+    const column   = error.column   ?? null;
+
+    // ─── Folio / registro duplicado (MySQL: ER_DUP_ENTRY / 1062) ───
+    if (code === 'ER_DUP_ENTRY' || errno === 1062) {
+      const texto = `${message} ${detail} ${column}`.toLowerCase();
+      let mensajeAmigable = 'El registro ya existe en la base de datos. Verifica los datos e inténtalo de nuevo.';
+
+      if (texto.includes('cc') || texto.includes('folio')) {
+        mensajeAmigable =
+          `El folio "${req.body?.cc ?? ''}" ya se encuentra registrado en el sistema. ` +
+          `Por favor, utiliza uno diferente o verifica el número.`;
+      } else if (texto.includes('equipment_id')) {
+        mensajeAmigable =
+          `Ya existe un certificado para el equipo "${req.body?.equipment_id ?? ''}". ` +
+          `Verifica los datos antes de continuar.`;
+      }
+
+      return res.status(409).json({
+        ok: false,
+        code,
+        errno,
+        sqlState,
+        column,
+        message: mensajeAmigable,
+        detail
+      });
+    }
+
+    // ─── Llave foránea inválida (1452 / 1216 / 1217) ───
+    if (errno === 1452 || errno === 1216 || errno === 1217) {
+      return res.status(400).json({
+        ok: false,
+        code,
+        errno,
+        sqlState,
+        column,
+        message: 'La entidad o equipo referenciado no existe en el sistema.',
+        detail
+      });
+    }
+
+    // ─── Campo NOT NULL sin valor (1048) ───
+    if (errno === 1048) {
+      return res.status(400).json({
+        ok: false,
+        code,
+        errno,
+        sqlState,
+        column,
+        message: 'Falta un campo obligatorio para poder guardar el certificado.',
+        detail
+      });
+    }
+
+    // ─── CHECK constraint (3819) ───
+    if (errno === 3819) {
+      return res.status(400).json({
+        ok: false,
+        code,
+        errno,
+        sqlState,
+        column,
+        message: 'Un valor no cumple con las restricciones definidas en la base de datos.',
+        detail
+      });
+    }
+
+    // ─── Formato de dato inválido (1366 / 1292) ───
+    if (errno === 1366 || errno === 1292) {
+      return res.status(400).json({
+        ok: false,
+        code,
+        errno,
+        sqlState,
+        column,
+        message: 'Revisa el formato de fechas y valores numéricos antes de guardar.',
+        detail
+      });
+    }
+
+    // ─── Valor fuera de rango o demasiado largo (1264 / 1406) ───
+    if (errno === 1264 || errno === 1406) {
+      return res.status(400).json({
+        ok: false,
+        code,
+        errno,
+        sqlState,
+        column,
+        message: 'Alguno de los valores excede el tamaño permitido en la base de datos.',
+        detail
+      });
+    }
+
+    // ─── Error genérico de integridad (sqlState 23000) ───
+    if (sqlState === '23000') {
+      return res.status(400).json({
+        ok: false,
+        code,
+        errno,
+        sqlState,
+        column,
+        message: 'Alguno de los datos no cumple con las restricciones de la base de datos.',
+        detail
+      });
+    }
+
+    // ─── Cualquier otro error inesperado del servidor ───
+    return res.status(500).json({
       ok: false,
-      message: 'Error en el servidor al guardar el certificado'
+      code,
+      errno,
+      sqlState,
+      message: 'Error en el servidor al guardar el certificado.',
+      detail: process.env.NODE_ENV === 'development' ? (detail || message) : undefined
     });
   }
 });
