@@ -13,7 +13,7 @@ const {
   obtenerEquipmentId,
   obtenerTablas,
   obtenerCertificadoCc
-} = require('../controllers/basedatos');
+} = require('../controllers/certificado');
 //El procesamiento de la tabla se hace en un servidor externo, por lo que no es necesario procesar la tabla en este archivo.
 //Rutas de la base de datos
 router.post('/nuevo', async (req, res) => {
