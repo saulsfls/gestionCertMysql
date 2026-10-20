@@ -6,7 +6,7 @@ const {
   crearCmc, 
   obtenerCmcs, 
   obtenerCmcId, 
-  obtenerCmcPorEquipo,
+  obtenerCmcPorIdEquipo,
   desactivarCmc, 
   activarCmc, 
   eliminarCmc
@@ -110,15 +110,15 @@ router.get('/cmc/:id', async (req, res) => {
 });
 
 // GET: Obtener los cálculos de CMC asociados a un equipo específico
-router.get('/cmc/equipo/:name_equipment', async (req, res) => {
+router.get('/cmc/equipo/:id_equipment', async (req, res) => {
   try {
-    const { name_equipment } = req.params;
-    const cmcs = await obtenerCmcPorEquipo(name_equipment);
+    const { id_equipment } = req.params;
+    const cmcs = await obtenerCmcPorEquipo(id_equipment);
 
     if (!cmcs || cmcs.length === 0) {
       return res.status(404).json({
         ok: false,
-        message: `No se encontraron cálculos de CMC para el equipo ${name_equipment}`
+        message: `No se encontraron cálculos de CMC para el equipo ${id_equipment}`
       });
     }
 
