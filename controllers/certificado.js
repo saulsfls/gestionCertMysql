@@ -18,6 +18,7 @@ async function crearCertificado(datosCertificado) {
     equipment_id,
     name_equipment,
     id_user,
+    pt,
     date_cal,
     date_cc,
     calibration_interval,
@@ -31,11 +32,11 @@ async function crearCertificado(datosCertificado) {
 
   const query = `
     INSERT INTO certificados (
-      cc, equipment_id, name_equipment, id_user, date_cal, date_cc,
+      cc, equipment_id, name_equipment, id_user , pt, date_cal, date_cc,
       calibration_interval, resolution, entity, cert_type,
       comments, active, data
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `;
 
   const values = [
@@ -43,6 +44,7 @@ async function crearCertificado(datosCertificado) {
     equipment_id,
     name_equipment,
     id_user,
+    pt,
     date_cal,
     date_cc,
     calibration_interval,
@@ -139,6 +141,7 @@ async function modificarCertificado(id, datosActualizados) {
     equipment_id,
     name_equipment,
     id_user,
+    pt,
     date_cal,
     date_cc,
     calibration_interval,
@@ -157,6 +160,7 @@ async function modificarCertificado(id, datosActualizados) {
       equipment_id = ?,
       name_equipment = ?,
       id_user = ?,
+      pt = ?,
       date_cal = ?,
       date_cc = ?,
       calibration_interval = ?,
@@ -174,6 +178,7 @@ async function modificarCertificado(id, datosActualizados) {
     equipment_id,
     name_equipment,
     id_user,
+    pt,
     date_cal,
     date_cc,
     calibration_interval,
