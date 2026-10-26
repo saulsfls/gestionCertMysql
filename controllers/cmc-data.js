@@ -13,7 +13,7 @@ const pool = mariadb.createPool({
 
 // Crear un nuevo registro de cálculo de CMC
 async function crearCmc(datosCmc) {
-  console.log(datosCmc.id_user);
+  //console.log(datosCmc.id_user);
   const {
     id_equipment,
     id_user,
