@@ -308,8 +308,9 @@ async function obtenerCertificadoCc(cc) {
     SELECT
       id,
       cc,
-      equipment_id,
+      equipment_id, 
       name_equipment,
+      pt,
       date_cal,
       date_cc,
       calibration_interval,

@@ -37,16 +37,17 @@ async function crearCmc(datosCmc) {
 
   const query = `
     INSERT INTO cmc_data (
-      id_equipment, id_user, value_ref_min, value_ref_max, interval_value, cert_associate,
+      id_equipment, id_user, pt,value_ref_min, value_ref_max, interval_value, cert_associate,
       active, u_combined, degrees_freedom, coefficient_expansion, u_expanded,
       stability, bias, drift, u_reference, s_reference, repeatability, reproducibility
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `;
 
   const values = [
     id_equipment,
     id_user,
+    pt,
     value_ref_min,
     value_ref_max,
     interval_value,
