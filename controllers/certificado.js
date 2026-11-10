@@ -18,7 +18,6 @@ async function crearCertificado(datosCertificado) {
     equipment_id,
     name_equipment,
     id_user,
-    pt,
     date_cal,
     date_cc,
     calibration_interval,
@@ -32,11 +31,11 @@ async function crearCertificado(datosCertificado) {
 
   const query = `
     INSERT INTO certificados (
-      cc, equipment_id, name_equipment, id_user , pt, date_cal, date_cc,
+      cc, equipment_id, name_equipment, id_user , date_cal, date_cc,
       calibration_interval, resolution, entity, cert_type,
       comments, active, data
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `;
 
   const values = [
@@ -44,7 +43,6 @@ async function crearCertificado(datosCertificado) {
     equipment_id,
     name_equipment,
     id_user,
-    pt,
     date_cal,
     date_cc,
     calibration_interval,
@@ -141,7 +139,6 @@ async function modificarCertificado(id, datosActualizados) {
     equipment_id,
     name_equipment,
     id_user,
-    pt,
     date_cal,
     date_cc,
     calibration_interval,
@@ -160,7 +157,6 @@ async function modificarCertificado(id, datosActualizados) {
       equipment_id = ?,
       name_equipment = ?,
       id_user = ?,
-      pt = ?,
       date_cal = ?,
       date_cc = ?,
       calibration_interval = ?,
@@ -178,7 +174,6 @@ async function modificarCertificado(id, datosActualizados) {
     equipment_id,
     name_equipment,
     id_user,
-    pt,
     date_cal,
     date_cc,
     calibration_interval,
@@ -286,7 +281,7 @@ async function obtenerTablas(equipmentId) {
           parameter:              t.parameter,
           unit:                   t.unit,
           range:                  t.range,
-          cmc:                    t.cmc,
+          pt:                     t.pt,
           calibration_equation:   t.calibration_equation,
           comments:               t.comments,
           columns:                t.columns || [],
@@ -310,7 +305,6 @@ async function obtenerCertificadoCc(cc) {
       cc,
       equipment_id, 
       name_equipment,
-      pt,
       date_cal,
       date_cc,
       calibration_interval,

@@ -15,8 +15,9 @@ const pool = mariadb.createPool({
 async function crearCmc(datosCmc) {
   //console.log(datosCmc.id_user);
   const {
-    id_equipment,
+    equipment_id,
     id_user,
+    pt,
     value_ref_min,
     value_ref_max,
     interval_value,
@@ -37,7 +38,7 @@ async function crearCmc(datosCmc) {
 
   const query = `
     INSERT INTO cmc_data (
-      id_equipment, id_user, pt,value_ref_min, value_ref_max, interval_value, cert_associate,
+      equipment_id , id_user, pt, value_ref_min, value_ref_max, interval_value, cert_associate,
       active, u_combined, degrees_freedom, coefficient_expansion, u_expanded,
       stability, bias, drift, u_reference, s_reference, repeatability, reproducibility
     )
@@ -45,7 +46,7 @@ async function crearCmc(datosCmc) {
   `;
 
   const values = [
-    id_equipment,
+    equipment_id,
     id_user,
     pt,
     value_ref_min,
@@ -106,10 +107,10 @@ async function obtenerCmcId(id) {
 }
 
 // Obtener todos los cálculos asociados a un equipo específico
-async function obtenerCmcPorIdEquipo(id_equipment) {
-  const query = 'SELECT * FROM cmc_data WHERE id_equipment = ? ORDER BY created_at DESC;';
+async function obtenerCmcPorIdEquipo(equipment_id) {
+  const query = 'SELECT * FROM cmc_data WHERE equipment_id = ? ORDER BY created_at DESC;';
   try {
-    const rows = await pool.query(query, [id_equipment]);
+    const rows = await pool.query(query, [equipment_id]);
     return rows;
   } catch (err) {
     console.error('Error al obtener cálculos de CMC por equipo:', err);
