@@ -14,7 +14,22 @@ const {
   obtenerTablas,
   obtenerCertificadoCc
 } = require('../controllers/certificado');
-//El procesamiento de la tabla se hace en un servidor externo, por lo que no es necesario procesar la tabla en este archivo.
+
+// -----------------------------------------------------------------------------
+// Helper local: extrae el actor del body para los endpoints que no reciben
+// el objeto completo del certificado (activar / desactivar).
+// -----------------------------------------------------------------------------
+function getActorFromBody(body) {
+  if (!body) return 'system';
+  return (
+    body.actor_id ||
+    body.updated_by ||
+    body.username ||
+    body.user ||
+    'system'
+  );
+}
+
 //Rutas de la base de datos
 router.post('/nuevo', async (req, res) => {
   try {
@@ -26,14 +41,13 @@ router.post('/nuevo', async (req, res) => {
   } catch (error) {
     console.error('Error al guardar el certificado:', error);
 
-    const code     = error.code     ?? null;   // 'ER_DUP_ENTRY'
-    const errno    = error.errno    ?? null;   // 1062
-    const sqlState = error.sqlState ?? null;   // '23000'
+    const code     = error.code     ?? null;
+    const errno    = error.errno    ?? null;
+    const sqlState = error.sqlState ?? null;
     const message  = error.message  ?? '';
     const detail   = error.sqlMessage ?? error.detail ?? '';
     const column   = error.column   ?? null;
 
-    // ─── Folio / registro duplicado (MySQL: ER_DUP_ENTRY / 1062) ───
     if (code === 'ER_DUP_ENTRY' || errno === 1062) {
       const texto = `${message} ${detail} ${column}`.toLowerCase();
       let mensajeAmigable = 'El registro ya existe en la base de datos. Verifica los datos e inténtalo de nuevo.';
@@ -49,100 +63,61 @@ router.post('/nuevo', async (req, res) => {
       }
 
       return res.status(409).json({
-        ok: false,
-        code,
-        errno,
-        sqlState,
-        column,
-        message: mensajeAmigable,
-        detail
+        ok: false, code, errno, sqlState, column,
+        message: mensajeAmigable, detail
       });
     }
 
-    // ─── Llave foránea inválida (1452 / 1216 / 1217) ───
     if (errno === 1452 || errno === 1216 || errno === 1217) {
       return res.status(400).json({
-        ok: false,
-        code,
-        errno,
-        sqlState,
-        column,
+        ok: false, code, errno, sqlState, column,
         message: 'La entidad o equipo referenciado no existe en el sistema.',
         detail
       });
     }
 
-    // ─── Campo NOT NULL sin valor (1048) ───
     if (errno === 1048) {
       return res.status(400).json({
-        ok: false,
-        code,
-        errno,
-        sqlState,
-        column,
+        ok: false, code, errno, sqlState, column,
         message: 'Falta un campo obligatorio para poder guardar el certificado.',
         detail
       });
     }
 
-    // ─── CHECK constraint (3819) ───
     if (errno === 3819) {
       return res.status(400).json({
-        ok: false,
-        code,
-        errno,
-        sqlState,
-        column,
+        ok: false, code, errno, sqlState, column,
         message: 'Un valor no cumple con las restricciones definidas en la base de datos.',
         detail
       });
     }
 
-    // ─── Formato de dato inválido (1366 / 1292) ───
     if (errno === 1366 || errno === 1292) {
       return res.status(400).json({
-        ok: false,
-        code,
-        errno,
-        sqlState,
-        column,
+        ok: false, code, errno, sqlState, column,
         message: 'Revisa el formato de fechas y valores numéricos antes de guardar.',
         detail
       });
     }
 
-    // ─── Valor fuera de rango o demasiado largo (1264 / 1406) ───
     if (errno === 1264 || errno === 1406) {
       return res.status(400).json({
-        ok: false,
-        code,
-        errno,
-        sqlState,
-        column,
+        ok: false, code, errno, sqlState, column,
         message: 'Alguno de los valores excede el tamaño permitido en la base de datos.',
         detail
       });
     }
 
-    // ─── Error genérico de integridad (sqlState 23000) ───
     if (sqlState === '23000') {
       return res.status(400).json({
-        ok: false,
-        code,
-        errno,
-        sqlState,
-        column,
+        ok: false, code, errno, sqlState, column,
         message: 'Alguno de los datos no cumple con las restricciones de la base de datos.',
         detail
       });
     }
 
-    // ─── Cualquier otro error inesperado del servidor ───
     return res.status(500).json({
-      ok: false,
-      code,
-      errno,
-      sqlState,
+      ok: false, code, errno, sqlState,
       message: 'Error en el servidor al guardar el certificado.',
       detail: process.env.NODE_ENV === 'development' ? (detail || message) : undefined
     });
@@ -193,11 +168,12 @@ router.get('/certificados/:id', async (req, res) => {
   }
 });
 
-// PUT: Desactivar certificado
+// PUT: Desactivar certificado  ← ahora pasa el actor
 router.put('/certificados/:id/desactivar', async (req, res) => {
   try {
     const { id } = req.params;
-    const certificado = await desactivarCertificado(id);
+    const actor = getActorFromBody(req.body);
+    const certificado = await desactivarCertificado(id, actor);
     res.status(200).json({
       ok: true,
       data: certificado
@@ -211,11 +187,12 @@ router.put('/certificados/:id/desactivar', async (req, res) => {
   }
 });
 
-// PUT: Activar certificado
+// PUT: Activar certificado  ← ahora pasa el actor
 router.put('/certificados/:id/activar', async (req, res) => {
   try {
     const { id } = req.params;
-    const certificado = await activarCertificado(id);
+    const actor = getActorFromBody(req.body);
+    const certificado = await activarCertificado(id, actor);
     res.status(200).json({
       ok: true,
       data: certificado
@@ -230,6 +207,8 @@ router.put('/certificados/:id/activar', async (req, res) => {
 });
 
 // PUT: Modificar/Guardar cambios de un certificado
+// El actor se toma automáticamente en el controlador (getActor busca
+// actor_id / updated_by / created_by / username / user dentro del body).
 router.put('/certificados/:id/save', async (req, res) => {
   try {
     const { id } = req.params;

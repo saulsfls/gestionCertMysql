@@ -11,6 +11,23 @@ const pool = mariadb.createPool({
   connectionLimit: 5
 });
 
+// -----------------------------------------------------------------------------
+// Helper: obtiene el usuario que realiza la acción, enviado desde el front.
+// Busca en varios nombres por flexibilidad (actor_id, updated_by, created_by,
+// username, user). Si no viene, cae a 'system'.
+// -----------------------------------------------------------------------------
+function getActor(body) {
+  if (!body) return 'system';
+  return (
+    body.actor_id ||
+    body.updated_by ||
+    body.created_by ||
+    body.username ||
+    body.user ||
+    'system'
+  );
+}
+
 // Crear un nuevo certificado
 async function crearCertificado(datosCertificado) {
   const {
@@ -29,13 +46,16 @@ async function crearCertificado(datosCertificado) {
     data
   } = datosCertificado;
 
+  const actor = getActor(datosCertificado);
+
   const query = `
     INSERT INTO certificados (
-      cc, equipment_id, name_equipment, id_user , date_cal, date_cc,
+      cc, equipment_id, name_equipment, id_user, date_cal, date_cc,
       calibration_interval, resolution, entity, cert_type,
-      comments, active, data
+      comments, active, data,
+      created_at, created_by, updated_at, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW(), ?);
   `;
 
   const values = [
@@ -51,12 +71,14 @@ async function crearCertificado(datosCertificado) {
     cert_type,
     comments,
     active ?? true,
-    data ? JSON.stringify(data) : null
+    data ? JSON.stringify(data) : null,
+    actor,   // created_by
+    actor    // updated_by
   ];
 
   try {
-    const res = await pool.query(query, values);       // sin [ ]
-    return await obtenerCertificadoId(res.insertId);   // res.insertId directo
+    const res = await pool.query(query, values);
+    return await obtenerCertificadoId(res.insertId);
   } catch (err) {
     console.error('Error al insertar certificado:', err);
 
@@ -71,9 +93,9 @@ async function crearCertificado(datosCertificado) {
     throw wrapped;
   }
 }
+
 // Obtener todos los certificados
 async function obtenerCertificados() {
-  //console.log('Obteniendo todos los certificados...');
   const query = 'SELECT * FROM certificados ORDER BY id DESC;';
   try {
     const rows = await pool.query(query);
@@ -109,10 +131,16 @@ async function obtenerCertificadoEquipmentId(equipmentId) {
 }
 
 // Desactivar un certificado
-async function desactivarCertificado(id) {
-  const query = 'UPDATE certificados SET active = false WHERE id = ?;';
+async function desactivarCertificado(id, actor = 'system') {
+  const query = `
+    UPDATE certificados
+    SET active = false,
+        updated_at = NOW(),
+        updated_by = ?
+    WHERE id = ?;
+  `;
   try {
-    await pool.query(query, [id]);
+    await pool.query(query, [actor, id]);
     return await obtenerCertificadoId(id);
   } catch (err) {
     console.error('Error al desactivar el certificado:', err);
@@ -121,10 +149,16 @@ async function desactivarCertificado(id) {
 }
 
 // Activar un certificado
-async function activarCertificado(id) {
-  const query = 'UPDATE certificados SET active = true WHERE id = ?;';
+async function activarCertificado(id, actor = 'system') {
+  const query = `
+    UPDATE certificados
+    SET active = true,
+        updated_at = NOW(),
+        updated_by = ?
+    WHERE id = ?;
+  `;
   try {
-    await pool.query(query, [id]);
+    await pool.query(query, [actor, id]);
     return await obtenerCertificadoId(id);
   } catch (err) {
     console.error('Error al activar el certificado:', err);
@@ -150,6 +184,8 @@ async function modificarCertificado(id, datosActualizados) {
     data,
   } = datosActualizados;
 
+  const actor = getActor(datosActualizados);
+
   const query = `
     UPDATE certificados 
     SET 
@@ -165,7 +201,9 @@ async function modificarCertificado(id, datosActualizados) {
       cert_type = ?,
       comments = ?,
       active = ?,
-      data = ?
+      data = ?,
+      updated_at = NOW(),
+      updated_by = ?
     WHERE id = ?;
   `;
 
@@ -183,6 +221,7 @@ async function modificarCertificado(id, datosActualizados) {
     comments,
     active ?? true,
     data ? JSON.stringify(data) : null,
+    actor,   // updated_by
     id
   ];
 
@@ -211,7 +250,7 @@ async function eliminarCertificado(id) {
 }
 
 // Obtener todos los equipment_id que tienen certificados asociados
-async function obtenerEquipmentId() { //Muestra todos los equipment_id que tienen certificados asociados, para poder filtrar en la tabla de certificados.
+async function obtenerEquipmentId() {
   const query = `
     SELECT DISTINCT equipment_id
     FROM certificados
@@ -234,7 +273,8 @@ async function obtenerTablas(equipmentId) {
   const query = `
     SELECT
       id, cc, equipment_id, name_equipment,
-      date_cal, date_cc, entity, cert_type, active, data
+      date_cal, date_cc, entity, cert_type, active, data,
+      created_at, created_by, updated_at, updated_by
     FROM certificados
     WHERE equipment_id = ?
       AND data IS NOT NULL
@@ -242,7 +282,7 @@ async function obtenerTablas(equipmentId) {
   `;
 
   try {
-    const rows = await pool.query(query, [equipmentId]);   // 👈 AQUÍ el fix
+    const rows = await pool.query(query, [equipmentId]);
     const tablas = [];
 
     for (const row of rows) {
@@ -257,12 +297,7 @@ async function obtenerTablas(equipmentId) {
       const resultTables = payload?.['Result Tables'] || [];
 
       for (const t of resultTables) {
-        const filas =
-          t.rows ||
-          t.data ||
-          t.values ||
-          t.measurements ||
-          [];
+        const filas = t.rows || t.data || t.values || t.measurements || [];
 
         tablas.push({
           certificado_id:  row.id,
@@ -274,6 +309,11 @@ async function obtenerTablas(equipmentId) {
           entity:          row.entity,
           cert_type:       row.cert_type,
           active:          !!row.active,
+
+          created_at:      row.created_at,
+          created_by:      row.created_by,
+          updated_at:      row.updated_at,
+          updated_by:      row.updated_by,
 
           table_id:               t.table_id,
           cc_id:                  t.cc_id,
@@ -312,7 +352,8 @@ async function obtenerCertificadoCc(cc) {
       entity,
       cert_type,
       comments,
-      active
+      active,
+      created_at, created_by, updated_at, updated_by
     FROM certificados
     WHERE cc = ?
     LIMIT 1;
