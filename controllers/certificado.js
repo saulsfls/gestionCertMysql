@@ -11,11 +11,9 @@ const pool = mariadb.createPool({
   connectionLimit: 5
 });
 
-// -----------------------------------------------------------------------------
-// Helper: obtiene el usuario que realiza la acción, enviado desde el front.
-// Busca en varios nombres por flexibilidad (actor_id, updated_by, created_by,
-// username, user). Si no viene, cae a 'system'.
-// -----------------------------------------------------------------------------
+// Expresión SQL para obtener la hora actual en México
+const NOW_MEXICO = "CONVERT_TZ(NOW(), 'UTC', 'America/Mexico_City')";
+
 function getActor(body) {
   if (!body) return 'system';
   return (
@@ -24,7 +22,7 @@ function getActor(body) {
     body.created_by ||
     body.username ||
     body.user ||
-    'system'
+    'system'  
   );
 }
 
@@ -34,7 +32,6 @@ async function crearCertificado(datosCertificado) {
     cc,
     equipment_id,
     name_equipment,
-    id_user,
     date_cal,
     date_cc,
     calibration_interval,
@@ -49,20 +46,19 @@ async function crearCertificado(datosCertificado) {
   const actor = getActor(datosCertificado);
 
   const query = `
-    INSERT INTO certificados (
-      cc, equipment_id, name_equipment, id_user, date_cal, date_cc,
+    INSERT INTO certificates (
+      cc, equipment_id, name_equipment, date_cal, date_cc,
       calibration_interval, resolution, entity, cert_type,
       comments, active, data,
       created_at, created_by, updated_at, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW(), ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${NOW_MEXICO}, ?, ${NOW_MEXICO}, ?);
   `;
 
   const values = [
     cc,
     equipment_id,
     name_equipment,
-    id_user,
     date_cal,
     date_cc,
     calibration_interval,
@@ -94,9 +90,9 @@ async function crearCertificado(datosCertificado) {
   }
 }
 
-// Obtener todos los certificados
+// Obtener todos los certificates
 async function obtenerCertificados() {
-  const query = 'SELECT * FROM certificados ORDER BY id DESC;';
+  const query = 'SELECT * FROM certificates ORDER BY id DESC;';
   try {
     const rows = await pool.query(query);
     return rows;
@@ -108,7 +104,7 @@ async function obtenerCertificados() {
 
 // Obtener un certificado por su ID autoincremental
 async function obtenerCertificadoId(id) {
-  const query = 'SELECT * FROM certificados WHERE id = ?;';
+  const query = 'SELECT * FROM certificates WHERE id = ?;';
   try {
     const rows = await pool.query(query, [id]);
     return rows[0];
@@ -120,7 +116,7 @@ async function obtenerCertificadoId(id) {
 
 // Obtener un certificado por equipment_id
 async function obtenerCertificadoEquipmentId(equipmentId) {
-  const query = 'SELECT * FROM certificados WHERE equipment_id = ?;';
+  const query = 'SELECT * FROM certificates WHERE equipment_id = ?;';
   try {
     const rows = await pool.query(query, [equipmentId]);
     return rows[0];
@@ -133,9 +129,9 @@ async function obtenerCertificadoEquipmentId(equipmentId) {
 // Desactivar un certificado
 async function desactivarCertificado(id, actor = 'system') {
   const query = `
-    UPDATE certificados
+    UPDATE certificates
     SET active = false,
-        updated_at = NOW(),
+        updated_at = ${NOW_MEXICO},
         updated_by = ?
     WHERE id = ?;
   `;
@@ -151,9 +147,9 @@ async function desactivarCertificado(id, actor = 'system') {
 // Activar un certificado
 async function activarCertificado(id, actor = 'system') {
   const query = `
-    UPDATE certificados
+    UPDATE certificates
     SET active = true,
-        updated_at = NOW(),
+        updated_at = ${NOW_MEXICO},
         updated_by = ?
     WHERE id = ?;
   `;
@@ -172,7 +168,6 @@ async function modificarCertificado(id, datosActualizados) {
     cc,
     equipment_id,
     name_equipment,
-    id_user,
     date_cal,
     date_cc,
     calibration_interval,
@@ -187,12 +182,11 @@ async function modificarCertificado(id, datosActualizados) {
   const actor = getActor(datosActualizados);
 
   const query = `
-    UPDATE certificados 
+    UPDATE certificates 
     SET 
       cc = ?,
       equipment_id = ?,
       name_equipment = ?,
-      id_user = ?,
       date_cal = ?,
       date_cc = ?,
       calibration_interval = ?,
@@ -202,7 +196,7 @@ async function modificarCertificado(id, datosActualizados) {
       comments = ?,
       active = ?,
       data = ?,
-      updated_at = NOW(),
+      updated_at = ${NOW_MEXICO},
       updated_by = ?
     WHERE id = ?;
   `;
@@ -211,7 +205,6 @@ async function modificarCertificado(id, datosActualizados) {
     cc,
     equipment_id,
     name_equipment,
-    id_user,
     date_cal,
     date_cc,
     calibration_interval,
@@ -240,7 +233,7 @@ async function eliminarCertificado(id) {
     const certificado = await obtenerCertificadoId(id);
     if (!certificado) return null;
 
-    const query = 'DELETE FROM certificados WHERE id = ?;';
+    const query = 'DELETE FROM certificates WHERE id = ?;';
     await pool.query(query, [id]);
     return certificado;
   } catch (err) {
@@ -249,11 +242,11 @@ async function eliminarCertificado(id) {
   }
 }
 
-// Obtener todos los equipment_id que tienen certificados asociados
+// Obtener todos los equipment_id que tienen certificates asociados
 async function obtenerEquipmentId() {
   const query = `
     SELECT DISTINCT equipment_id
-    FROM certificados
+    FROM certificates
     WHERE equipment_id IS NOT NULL
       AND equipment_id <> ''
     ORDER BY equipment_id ASC;
@@ -275,7 +268,7 @@ async function obtenerTablas(equipmentId) {
       id, cc, equipment_id, name_equipment,
       date_cal, date_cc, entity, cert_type, active, data,
       created_at, created_by, updated_at, updated_by
-    FROM certificados
+    FROM certificates
     WHERE equipment_id = ?
       AND data IS NOT NULL
     ORDER BY date_cal DESC, id DESC;
@@ -354,7 +347,7 @@ async function obtenerCertificadoCc(cc) {
       comments,
       active,
       created_at, created_by, updated_at, updated_by
-    FROM certificados
+    FROM certificates
     WHERE cc = ?
     LIMIT 1;
   `;
