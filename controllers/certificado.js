@@ -363,7 +363,7 @@ async function obtenerCertificadoCc(cc) {
 
 module.exports = {
   query: (text, params) => pool.query(text, params),
-  crearCertificado,
+  crearCertificado, 
   obtenerCertificados,
   obtenerCertificadoId,
   obtenerCertificadoEquipmentId,

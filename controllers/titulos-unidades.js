@@ -911,6 +911,52 @@ async function eliminarUnidad(magnitudId, simbolo) {
   }
 }
 
+async function actualizarCatalogoCompleto(catalogId, nuevoData, modo = 'replace') {
+  const id = String(catalogId || '').trim();
+  if (id !== 'titulos' && id !== 'unidades') {
+    throw Object.assign(
+      new Error(`Catálogo inválido: "${id}". Debe ser 'titulos' o 'unidades'.`),
+      { status: 400, code: 'CATALOGO_INVALIDO' }
+    );
+  }
+
+  if (nuevoData === null || typeof nuevoData !== 'object' || Array.isArray(nuevoData)) {
+    throw Object.assign(
+      new Error('El JSON debe ser un objeto plano (no array, no null).'),
+      { status: 400, code: 'JSON_INVALIDO' }
+    );
+  }
+
+  if (modo !== 'replace' && modo !== 'merge') {
+    throw Object.assign(
+      new Error(`modo inválido: "${modo}". Usa 'replace' o 'merge'.`),
+      { status: 400, code: 'MODO_INVALIDO' }
+    );
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    const { data: existente } = await leerFilaParaActualizar(conn, id);
+
+    const finalData = modo === 'merge'
+      ? { ...existente, ...nuevoData }
+      : nuevoData;
+
+    await escribirFila(conn, id, finalData);
+    await conn.commit();
+
+    return { id, modo, total: Object.keys(finalData).length, data: finalData };
+  } catch (err) {
+    if (conn) try { await conn.rollback(); } catch { /* noop */ }
+    console.error(`Error al actualizar catálogo "${catalogId}":`, err);
+    throw err.status ? err : wrapError(err);
+  } finally {
+    if (conn) conn.release();
+  }
+}
 
 // ============================================================
 // EXPORTS
@@ -941,4 +987,5 @@ module.exports = {
   eliminarSubparametro,
   eliminarMagnitud,
   eliminarUnidad,
+  actualizarCatalogoCompleto,
 };

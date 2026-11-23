@@ -26,6 +26,7 @@ const {
   eliminarSubparametro,
   eliminarMagnitud,
   eliminarUnidad,
+  actualizarCatalogoCompleto
 } = require('../controllers/titulos-unidades');
 
 
@@ -364,6 +365,56 @@ router.delete('/magnitudes/:magnitudId/unidades/:simbolo', async (req, res) => {
       error,
       `DELETE /magnitudes/${req.params.magnitudId}/unidades/${req.params.simbolo}`
     );
+  }
+});
+
+// ============================================================
+// ACTUALIZACIÓN MASIVA (editor JSON)
+// ============================================================
+
+// PUT: reemplaza/fusiona el JSON completo de un catálogo
+// Ej: PUT /catalogo/titulos   body: { data: {...}, modo: 'replace' | 'merge' }
+router.put('/:catalogId', async (req, res) => {
+  try {
+    const { catalogId } = req.params;
+
+    // Validación rápida del param antes de tocar la BD
+    if (catalogId !== 'titulos' && catalogId !== 'unidades') {
+      return res.status(400).json({
+        ok: false,
+        code: 'CATALOGO_INVALIDO',
+        message: `Catálogo inválido: "${catalogId}". Usa 'titulos' o 'unidades'.`,
+      });
+    }
+
+    const { data, modo } = req.body ?? {};
+
+    if (data === undefined) {
+      return res.status(400).json({
+        ok: false,
+        code: 'BODY_INVALIDO',
+        message: 'Falta el campo "data" en el body.',
+      });
+    }
+
+    const actor = getActorFromBody(req.body); // disponible para auditoría futura
+
+    const resultado = await actualizarCatalogoCompleto(
+      catalogId,
+      data,
+      modo || 'replace'
+    );
+
+    return res.status(200).json({
+      ok: true,
+      catalogId,
+      modo: resultado.modo,
+      total: resultado.total,
+      actor,
+      data: resultado.data,
+    });
+  } catch (error) {
+    return responderError(res, error, `PUT /${req.params.catalogId}`);
   }
 });
 
